@@ -1,30 +1,19 @@
-#!/usr/bin/env python
-import argparse
 from telegram.ext import Updater, CommandHandler
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Chgk Rating Telegram bot')
-    parser.add_argument('--token', type=str, required=True, help='Telegram API token')
-    args = parser.parse_args()
-    run_bot(args.token)
+class Bot:
+    def __init__(self, token, db):
+        self.updater = Updater(token)
+        self.updater.dispatcher.add_handler(CommandHandler('ping', self.ping))
+        self.updater.dispatcher.add_handler(CommandHandler('watch', self.watch))
+        self.db = db
 
+    def run(self):
+        self.updater.start_polling()
+        self.updater.idle()
 
-def run_bot(token):
-    updater = Updater(token)
-    updater.dispatcher.add_handler(CommandHandler('ping', ping))
-    updater.dispatcher.add_handler(CommandHandler('watch', watch))
-    updater.start_polling()
-    updater.idle()
+    def ping(self, bot, update):
+        update.message.reply_text('PONG')
 
-
-def ping(bot, update):
-    update.message.reply_text('PONG')
-
-
-def watch(bot, update):
-    update.message.reply_text('NOT IMPLEMENTED')
-
-
-if __name__ == '__main__':
-    main()
+    def watch(self, bot, update):
+        update.message.reply_text('NOT IMPLEMENTED')
