@@ -18,6 +18,10 @@ class Bot:
     def __init__(self, token, db, rating):
         self._updater = Updater(token)
         self._updater.dispatcher.add_handler(
+            CommandHandler('start', self.handle_help))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('help', self.handle_help))
+        self._updater.dispatcher.add_handler(
             CommandHandler('ping', self.handle_ping))
         self._updater.dispatcher.add_handler(
             CommandHandler('follow', self.handle_follow))
@@ -35,6 +39,10 @@ class Bot:
         self._updater.job_queue.run_repeating(self._update_job, UPDATE_SECONDS)
         self._updater.start_polling()
         self._updater.idle()
+
+    def handle_help(self, bot, update):
+        update.message.reply_text('Доступные команды: ' +
+                                  '/follow, /unfollow, /subscriptions, /update, /ping')
 
     def handle_ping(self, bot, update):
         update.message.reply_text('PONG')
@@ -87,6 +95,7 @@ class Bot:
     def handle_update(self, bot, update):
         chat_id = update.message.chat.id
         try:
+            bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
             _, ratings = self._update(chat_id)
             self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
@@ -109,7 +118,6 @@ class Bot:
         return changed, ratings
 
     def _send_update(self, bot, chat_id, ratings):
-        bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
         rating_lines = []
         for team, old_rating, new_rating in ratings:
             rating_lines.append('%s: %s' % (team.name, rating_diff(old_rating, new_rating)))
