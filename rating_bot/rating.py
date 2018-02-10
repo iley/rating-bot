@@ -1,7 +1,7 @@
 import requests
 import logging
-from exc import RatingBotError
-from model import RatingRecord
+from .exc import RatingBotError
+from .model import RatingRecord
 
 
 log = logging.getLogger(__name__)

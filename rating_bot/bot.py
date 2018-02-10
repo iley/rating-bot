@@ -3,8 +3,8 @@ import telegram
 from telegram.ext import Updater, CommandHandler
 import logging
 import re
-from exc import RatingBotError
-from model import rating_diff
+from .exc import RatingBotError
+from .model import rating_diff
 
 
 log = logging.getLogger(__name__)

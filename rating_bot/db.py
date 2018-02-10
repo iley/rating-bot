@@ -2,8 +2,8 @@
 import sqlite3
 import os.path
 import logging
-from exc import RatingBotError
-from model import Team, RatingRecord
+from .exc import RatingBotError
+from .model import Team, RatingRecord
 
 
 log = logging.getLogger(__name__)
