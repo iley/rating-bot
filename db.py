@@ -1,6 +1,7 @@
 import sqlite3
 import os.path
 import logging
+from exc import RatingBotError
 
 
 log = logging.getLogger(__name__)
@@ -8,26 +9,61 @@ log = logging.getLogger(__name__)
 
 SCHEMA = '''
 CREATE TABLE rating (
-    team_id integer,
-    release_id integer,
-    rating_value real,
-    rating_position real,
-    date text,
-    formula text,
-    primary key(team_id, release_id)
+    team_id INTEGER,
+    release_id INTEGER,
+    rating_value REAL,
+    rating_position REAL,
+    date TEXT,
+    formula TEXT,
+    PRIMARY KEY(team_id, release_id)
+);
+
+CREATE TABLE subscriptions (
+    chat_id INTEGER,
+    team_id INTEGER,
+    PRIMARY KEY(chat_id, team_id)
 );
 '''
 
 
 class Database:
     def __init__(self, path):
-        new_file = False
-        if os.path.isfile(path):
-            new_file = True
-        self.conn = sqlite3.connect(path)
+        self._path = path
+        new_file = not os.path.isfile(path)
         if new_file:
             log.info('Initializing database %s' % path)
             self.create_schema()
 
+    def _connect(self):
+        return sqlite3.connect(self._path)
+
     def create_schema(self):
-        self.conn.executescript(SCHEMA)
+        conn = self._connect()
+        with conn:
+            conn.executescript(SCHEMA)
+
+    def add_subscription(self, chat_id, team_id):
+        try:
+            conn = self._connect()
+            with conn:
+                conn.execute('INSERT INTO subscriptions (chat_id, team_id) VALUES (?, ?)',
+                            (chat_id, team_id))
+        except sqlite3.IntegrityError as ex:
+            raise RatingBotError('Subscription already exists') from ex
+
+    def remove_subscription(self, chat_id, team_id):
+        try:
+            conn = self._connect()
+            with conn:
+                conn.execute('DELETE FROM subscriptions WHERE chat_id=? AND team_ID=?',
+                            (chat_id, team_id))
+        except sqlite3.IntegrityError as ex:
+            raise RatingBotError('Subscription already exists') from ex
+
+    def get_subscriptions(self, chat_id):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('SELECT team_id FROM subscriptions WHERE chat_id=?', (chat_id,))
+            rows = c.fetchall()
+        return [row[0] for row in rows]

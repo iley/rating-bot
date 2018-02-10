@@ -1,0 +1,2 @@
+class RatingBotError(Exception):
+    pass
