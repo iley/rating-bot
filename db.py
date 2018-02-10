@@ -3,6 +3,7 @@ import sqlite3
 import os.path
 import logging
 from exc import RatingBotError
+from model import Team, RatingRecord
 
 
 log = logging.getLogger(__name__)
@@ -14,9 +15,7 @@ CREATE TABLE rating (
     release_id INTEGER,
     rating_value REAL,
     rating_position REAL,
-    date TEXT,
-    formula TEXT,
-    PRIMARY KEY(team_id, release_id)
+    PRIMARY KEY(team_id)
 );
 
 CREATE TABLE subscriptions (
@@ -72,11 +71,21 @@ class Database:
             rows = c.fetchall()
         return [Team(*row) for row in rows]
 
+    def get_saved_reating(self, team_id):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('SELECT release_id, rating_value, rating_position FROM rating WHERE team_id=? ORDER BY release_id DESC LIMIT 1',
+                      (team_id,))
+            row = c.fetchone()
+            if not row:
+                return None
+            return RatingRecord(*row)
 
-class Team:
-    def __init__(self, id, name):
-        self.id = id
-        self.name = name
-
-    def __str__(self):
-        return '%s (%d)' % (self.name, self.id)
+    def update_rating(self, team_id, rating):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM rating WHERE team_id=?', (team_id,))
+            c.execute('INSERT INTO rating (team_id, release_id, rating_value, rating_position) VALUES (?, ?, ?, ?)',
+                      (team_id, rating.release, rating.value, rating.position))
