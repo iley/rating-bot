@@ -21,6 +21,7 @@ CREATE TABLE rating (
 CREATE TABLE subscriptions (
     chat_id INTEGER,
     team_id INTEGER,
+    team_name TEXT,
     PRIMARY KEY(chat_id, team_id)
 );
 '''
@@ -42,12 +43,12 @@ class Database:
         with conn:
             conn.executescript(SCHEMA)
 
-    def add_subscription(self, chat_id, team_id):
+    def add_subscription(self, chat_id, team_id, team_name):
         try:
             conn = self._connect()
             with conn:
-                conn.execute('INSERT INTO subscriptions (chat_id, team_id) VALUES (?, ?)',
-                            (chat_id, team_id))
+                conn.execute('INSERT INTO subscriptions (chat_id, team_id, team_name) VALUES (?, ?, ?)',
+                            (chat_id, team_id, team_name))
         except sqlite3.IntegrityError as ex:
             raise RatingBotError('Subscription already exists') from ex
 
@@ -64,6 +65,15 @@ class Database:
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('SELECT team_id FROM subscriptions WHERE chat_id=?', (chat_id,))
+            c.execute('SELECT team_id, team_name FROM subscriptions WHERE chat_id=?', (chat_id,))
             rows = c.fetchall()
-        return [row[0] for row in rows]
+        return [Team(*row) for row in rows]
+
+
+class Team:
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+    def __str__(self):
+        return '%s (%d)' % (self.name, self.id)

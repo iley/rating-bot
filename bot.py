@@ -10,19 +10,20 @@ log = logging.getLogger(__name__)
 class Bot:
     INT_ARG_RE = re.compile(r'/\w+\s+(\d+)')
 
-    def __init__(self, token, db):
-        self.updater = Updater(token)
-        self.updater.dispatcher.add_handler(CommandHandler('start', self.start))
-        self.updater.dispatcher.add_handler(CommandHandler('ping', self.ping))
-        self.updater.dispatcher.add_handler(CommandHandler('follow', self.follow))
-        self.updater.dispatcher.add_handler(CommandHandler('unfollow', self.unfollow))
-        self.updater.dispatcher.add_handler(CommandHandler('subscriptions', self.subscriptions))
-        self.db = db
+    def __init__(self, token, db, rating):
+        self._updater = Updater(token)
+        self._updater.dispatcher.add_handler(CommandHandler('start', self.start))
+        self._updater.dispatcher.add_handler(CommandHandler('ping', self.ping))
+        self._updater.dispatcher.add_handler(CommandHandler('follow', self.follow))
+        self._updater.dispatcher.add_handler(CommandHandler('unfollow', self.unfollow))
+        self._updater.dispatcher.add_handler(CommandHandler('subscriptions', self.subscriptions))
+        self._db = db
+        self._rating = rating
 
     def run(self):
         log.info('Starting the telegram bot')
-        self.updater.start_polling()
-        self.updater.idle()
+        self._updater.start_polling()
+        self._updater.idle()
 
     def start(self, bot, update):
         update.message.reply_text('Welcome!')
@@ -40,8 +41,10 @@ class Bot:
             return
         team_id = int(match.group(1))
         try:
-            self.db.add_subscription(chat_id, team_id)
-            update.message.reply_text('Subscribed to team %d' % team_id)
+            team_info = self._rating.team_info(team_id)
+            team_name = team_info['name']
+            self._db.add_subscription(chat_id, team_id, team_name)
+            update.message.reply_text('Subscribed to team %s (%d)' % (team_name, team_id))
         except RatingBotError as ex:
             update.message.reply_text('Error: %s' % ex)
 
@@ -55,16 +58,16 @@ class Bot:
             return
         team_id = int(match.group(1))
         try:
-            self.db.remove_subscription(chat_id, team_id)
+            self._db.remove_subscription(chat_id, team_id)
             update.message.reply_text('Unsubscribed from team %d' % team_id)
         except RatingBotError as ex:
             update.message.reply_text('Error: %s' % ex)
 
     def subscriptions(self, bot, update):
         chat_id = update.message.chat.id
-        team_ids = self.db.get_subscriptions(chat_id)
-        if not team_ids:
+        teams = self._db.get_subscriptions(chat_id)
+        if not teams:
             update.message.reply_text('No subscriptions found')
         else:
-            team_list = ', '.join(str(id) for id in team_ids)
+            team_list = ', '.join(str(team) for team in teams)
             update.message.reply_text('Current subscriptions: %s' % team_list)
