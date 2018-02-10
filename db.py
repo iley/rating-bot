@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sqlite3
 import os.path
 import logging
@@ -50,7 +51,8 @@ class Database:
                 conn.execute('INSERT INTO subscriptions (chat_id, team_id, team_name) VALUES (?, ?, ?)',
                             (chat_id, team_id, team_name))
         except sqlite3.IntegrityError as ex:
-            raise RatingBotError('Subscription already exists') from ex
+            raise RatingBotError('Вы уже подписаны на обновления команды %s (%d)' %
+                                 (team_name, team_id)) from ex
 
     def remove_subscription(self, chat_id, team_id):
         try:
@@ -59,7 +61,8 @@ class Database:
                 conn.execute('DELETE FROM subscriptions WHERE chat_id=? AND team_ID=?',
                             (chat_id, team_id))
         except sqlite3.IntegrityError as ex:
-            raise RatingBotError('Subscription already exists') from ex
+            raise RatingBotError('Вы не подписаны на обновления команды %s (%d)' %
+                                 (team_name, team_id)) from ex
 
     def get_subscriptions(self, chat_id):
         conn = self._connect()
