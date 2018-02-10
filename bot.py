@@ -9,29 +9,37 @@ from model import rating_diff
 
 log = logging.getLogger(__name__)
 
+UPDATE_SECONDS = 15 * 60
+
 
 class Bot:
     INT_ARG_RE = re.compile(r'/\w+\s+(\d+)')
 
     def __init__(self, token, db, rating):
         self._updater = Updater(token)
-        self._updater.dispatcher.add_handler(CommandHandler('ping', self.ping))
-        self._updater.dispatcher.add_handler(CommandHandler('follow', self.follow))
-        self._updater.dispatcher.add_handler(CommandHandler('unfollow', self.unfollow))
-        self._updater.dispatcher.add_handler(CommandHandler('subscriptions', self.subscriptions))
-        self._updater.dispatcher.add_handler(CommandHandler('update', self.handle_update))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('ping', self.handle_ping))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('follow', self.handle_follow))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('unfollow', self.handle_unfollow))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('subscriptions', self.handle_subscriptions))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('update', self.handle_update))
         self._db = db
         self._rating = rating
 
     def run(self):
         log.info('Starting the telegram bot')
+        self._updater.job_queue.run_repeating(self._update_job, UPDATE_SECONDS)
         self._updater.start_polling()
         self._updater.idle()
 
-    def ping(self, bot, update):
+    def handle_ping(self, bot, update):
         update.message.reply_text('PONG')
 
-    def follow(self, bot, update):
+    def handle_follow(self, bot, update):
         chat_id = update.message.chat.id
         msg_text = update.message.text
         log.info('Received follow message: "%s"', msg_text)
@@ -49,7 +57,7 @@ class Bot:
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
 
-    def unfollow(self, bot, update):
+    def handle_unfollow(self, bot, update):
         chat_id = update.message.chat.id
         msg_text = update.message.text
         log.info('Received unfollow message: "%s"', msg_text)
@@ -64,7 +72,7 @@ class Bot:
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
 
-    def subscriptions(self, bot, update):
+    def handle_subscriptions(self, bot, update):
         chat_id = update.message.chat.id
         teams = self._db.get_subscriptions(chat_id)
         if not teams:
@@ -79,17 +87,16 @@ class Bot:
     def handle_update(self, bot, update):
         chat_id = update.message.chat.id
         try:
-            bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
-            rating_lines = []
-            for team, old_rating, new_rating in self._update(chat_id):
-                rating_lines.append('%s: %s' % (team.name, rating_diff(old_rating, new_rating)))
-            update.message.reply_text('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines))
+            _, ratings = self._update(chat_id)
+            self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
 
     def _update(self, chat_id):
+        log.info('Updating rating for chat %d' % chat_id)
         teams = self._db.get_subscriptions(chat_id)
         ratings = []
+        changed = False
         if not teams:
             raise RatingBotError('Нет подписок')
         for team in teams:
@@ -97,5 +104,20 @@ class Bot:
             old_rating = self._db.get_saved_reating(team.id)
             if old_rating != new_rating:
                 self._db.update_rating(team.id, new_rating)
+                changed = True
             ratings.append((team, old_rating, new_rating))
-        return ratings
+        return changed, ratings
+
+    def _send_update(self, bot, chat_id, ratings):
+        bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
+        rating_lines = []
+        for team, old_rating, new_rating in ratings:
+            rating_lines.append('%s: %s' % (team.name, rating_diff(old_rating, new_rating)))
+        bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
+
+    def _update_job(self, bot, job):
+        chat_ids = self._db.get_chat_ids()
+        for chat_id in chat_ids:
+            changed, ratings = self._update(chat_id)
+            if changed:
+                self._send_update(bot, chat_id, ratings)

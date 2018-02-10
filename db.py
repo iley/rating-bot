@@ -89,3 +89,11 @@ class Database:
             c.execute('DELETE FROM rating WHERE team_id=?', (team_id,))
             c.execute('INSERT INTO rating (team_id, release_id, rating_value, rating_position) VALUES (?, ?, ?, ?)',
                       (team_id, rating.release, rating.value, rating.position))
+
+    def get_chat_ids(self):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('SELECT DISTINCT chat_id FROM subscriptions')
+            rows = c.fetchall()
+        return [r[0] for r in rows]
