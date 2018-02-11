@@ -1,5 +1,5 @@
-FROM ubuntu:latest
-RUN apt-get update && apt-get install -y python3 python3-pip python3-dev && apt-get clean
+FROM debian:testing
+RUN apt-get update && apt-get install -y python3 python3-pip && apt-get clean
 RUN mkdir -p /opt/rating_bot/
 COPY rating_bot /opt/rating_bot
 COPY requirements.txt /opt/rating_bot/
