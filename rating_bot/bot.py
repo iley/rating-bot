@@ -4,7 +4,6 @@ from telegram.ext import Updater, CommandHandler
 import logging
 import re
 from .exc import RatingBotError
-from .model import rating_diff
 
 
 log = logging.getLogger(__name__)
@@ -118,10 +117,14 @@ class Bot:
         return changed, ratings
 
     def _send_update(self, bot, chat_id, ratings):
-        rating_lines = []
+        rating_table = [['Команда', 'Рейтинг', 'Позиция']]
         for team, old_rating, new_rating in ratings:
-            rating_lines.append('%s: %s' % (team.name, rating_diff(old_rating, new_rating)))
-        bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
+            rating, position = rating_diff(old_rating, new_rating)
+            rating_table.append([team.name, rating, position])
+        text = 'Рейтинг обновлён:\n```\n%s```' % format_table(rating_table)
+        log.info('Sending message: %s' % text)
+        bot.send_message(chat_id=chat_id, text=text,
+                         parse_mode=telegram.ParseMode.MARKDOWN)
 
     def _update_job(self, bot, job):
         chat_ids = self._db.get_chat_ids()
@@ -129,3 +132,39 @@ class Bot:
             changed, ratings = self._update(chat_id)
             if changed:
                 self._send_update(bot, chat_id, ratings)
+
+
+def rating_diff(old, new):
+    if old is None or old == new:
+        return '%d (+0)' % new.value, '%s (+0)' % format_float(new.position)
+
+    vdiff = new.value - old.value
+    vsign = '+' if vdiff >= 0 else ''
+    vdiff_str = '%s%d' % (vsign, vdiff)
+
+    pdiff = new.position - old.position
+    psign = '+' if pdiff >= 0 else ''
+    pdiff_str = '%s%d' % (psign, pdiff)
+
+    return ('%d (%s)' % (new.value, vdiff_str),
+            '%s (%s)' % (format_float(new.position), pdiff_str))
+
+
+def format_table(table):
+    if len(table) == 0:
+        return ''
+    widths = [0] * len(table[0])
+    for row in table:
+        for c, val in enumerate(row):
+            widths[c] = max(widths[c], len(val))
+    lines = []
+    for row in table:
+        padded_row = [val.ljust(width) for val, width in zip(row, widths)]
+        lines.append(' | '.join(padded_row))
+    divider = '-+-'.join('-' * w for w in widths)
+    lines = [lines[0]] + [divider] + lines[1:]
+    return '\n'.join(lines)
+
+
+def format_float(x):
+    return ('%f' % x).rstrip('0').rstrip('.')
