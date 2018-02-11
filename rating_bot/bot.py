@@ -13,7 +13,7 @@ UPDATE_SECONDS = 15 * 60
 
 
 class Bot:
-    INT_ARG_RE = re.compile(r'/\w+\s+(\d+)')
+    INT_ARG_RE = re.compile(r'/\S+\s+(\d+)')
 
     def __init__(self, token, db, rating):
         self._updater = Updater(token)
