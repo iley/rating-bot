@@ -38,11 +38,11 @@ def rating_diff(old, new):
         return str(new)
 
     vdiff = new.value - old.value
-    vsign = '+' if vdiff >= 0 else '-'
+    vsign = '+' if vdiff >= 0 else ''
     vdiff_str = '%s%d' % (vsign, vdiff)
 
     pdiff = new.position - old.position
-    psign = '+' if pdiff >= 0 else '-'
+    psign = '+' if pdiff >= 0 else ''
     pdiff_str = '%s%d' % (psign, pdiff)
 
     return '%d (%s), место %s (%s)' % (new.value, vdiff_str, new.position, pdiff_str)
