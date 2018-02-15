@@ -43,6 +43,6 @@ def rating_diff(old, new):
 
     pdiff = new.position - old.position
     psign = '+' if pdiff >= 0 else ''
-    pdiff_str = '%s%d' % (psign, pdiff)
+    pdiff_str = '%s%s' % (psign, format_float(pdiff))
 
-    return '%d (%s), место %s (%s)' % (new.value, vdiff_str, new.position, pdiff_str)
+    return '%d (%s), место %s (%s)' % (new.value, vdiff_str, format_float(new.position), pdiff_str)
