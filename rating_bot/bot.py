@@ -4,7 +4,6 @@ from telegram.ext import Updater, CommandHandler
 import logging
 import re
 from .exc import RatingBotError
-from .model import rating_diff
 
 
 log = logging.getLogger(__name__)
@@ -110,9 +109,9 @@ class Bot:
             raise RatingBotError('Нет подписок')
         for team in teams:
             new_rating = self._rating.get_rating(team.id)
-            old_rating = self._db.get_saved_reating(team.id)
+            old_rating = self._db.get_saved_reating(chat_id, team.id)
             if old_rating != new_rating:
-                self._db.update_rating(team.id, new_rating)
+                self._db.update_rating(chat_id, team.id, new_rating)
                 changed = True
             ratings.append((team, old_rating, new_rating))
         return changed, ratings
@@ -120,7 +119,7 @@ class Bot:
     def _send_update(self, bot, chat_id, ratings):
         rating_lines = []
         for team, old_rating, new_rating in ratings:
-            rating_lines.append('%s: %s' % (team.name, rating_diff(old_rating, new_rating)))
+            rating_lines.append('%s: %s' % (team.name, new_rating - old_rating))
         bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
 
     def _update_job(self, bot, job):

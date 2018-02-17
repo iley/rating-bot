@@ -3,25 +3,19 @@ import sqlite3
 import os.path
 import logging
 from .exc import RatingBotError
-from .model import Team, RatingRecord
+from .data_types import Team, Rating
 
 
 log = logging.getLogger(__name__)
 
 
 SCHEMA = '''
-CREATE TABLE rating (
-    team_id INTEGER,
-    release_id INTEGER,
-    rating_value REAL,
-    rating_position REAL,
-    PRIMARY KEY(team_id)
-);
-
 CREATE TABLE subscriptions (
     chat_id INTEGER,
     team_id INTEGER,
     team_name TEXT,
+    rating REAL,
+    position REAL,
     PRIMARY KEY(chat_id, team_id)
 );
 '''
@@ -47,7 +41,9 @@ class Database:
         try:
             conn = self._connect()
             with conn:
-                conn.execute('INSERT INTO subscriptions (chat_id, team_id, team_name) VALUES (?, ?, ?)',
+                conn.execute('INSERT INTO subscriptions ' +
+                             '(chat_id, team_id, team_name, rating, position) ' +
+                             'VALUES (?, ?, ?, 0, 0)',
                             (chat_id, team_id, team_name))
         except sqlite3.IntegrityError as ex:
             raise RatingBotError('Вы уже подписаны на обновления команды %s (%d)' %
@@ -71,24 +67,23 @@ class Database:
             rows = c.fetchall()
         return [Team(*row) for row in rows]
 
-    def get_saved_reating(self, team_id):
+    def get_saved_reating(self, chat_id, team_id):
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('SELECT release_id, rating_value, rating_position FROM rating WHERE team_id=? ORDER BY release_id DESC LIMIT 1',
-                      (team_id,))
+            c.execute('SELECT rating, position FROM subscriptions WHERE chat_id=? AND team_id=?',
+                      (chat_id, team_id))
             row = c.fetchone()
             if not row:
                 return None
-            return RatingRecord(*row)
+            return Rating(*row)
 
-    def update_rating(self, team_id, rating):
+    def update_rating(self, chat_id, team_id, rating):
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('DELETE FROM rating WHERE team_id=?', (team_id,))
-            c.execute('INSERT INTO rating (team_id, release_id, rating_value, rating_position) VALUES (?, ?, ?, ?)',
-                      (team_id, rating.release, rating.value, rating.position))
+            c.execute('UPDATE subscriptions SET rating=?, position=? WHERE chat_id=? AND team_id=?',
+                      (rating.value, rating.position, chat_id, team_id))
 
     def get_chat_ids(self):
         conn = self._connect()

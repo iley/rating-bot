@@ -1,7 +1,7 @@
 import requests
 import logging
 from .exc import RatingBotError
-from .model import RatingRecord
+from .data_types import Rating
 
 
 log = logging.getLogger(__name__)
@@ -28,14 +28,12 @@ class RatingClient:
             log.info('Fetching rating for %d' % team_id)
             r = requests.get('%s/api/teams/%d/rating.json' % (self.BASE_URL, team_id))
             r.raise_for_status()
-            records = [RatingRecord.fromJSON(d) for d in r.json()]
+
+            records = r.json()
             if not records:
                 raise RatingBotError('Рейтинг для команды #%d не найден' % team_id)
-            last_record = records[0]
-            for record in records[1:]:
-                if record.release > last_record.release:
-                    last_record = record
-            return last_record
+            last_record = max(records, key=lambda d: int(d['idrelease']))
+            return Rating.fromJSON(last_record)
 
         except Exception as ex:
             log.exception(ex)

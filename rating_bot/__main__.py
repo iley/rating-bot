@@ -6,7 +6,7 @@ import sys
 
 from .bot import Bot
 from .db import Database
-from .rating import RatingClient
+from .rating_client import RatingClient
 
 
 def main():
