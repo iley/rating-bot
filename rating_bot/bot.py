@@ -113,13 +113,13 @@ class Bot:
             if old_rating != new_rating:
                 self._db.update_rating(chat_id, team.id, new_rating)
                 changed = True
-            ratings.append((team, old_rating, new_rating))
+            ratings.append((team, new_rating - old_rating))
         return changed, ratings
 
     def _send_update(self, bot, chat_id, ratings):
         rating_lines = []
-        for team, old_rating, new_rating in ratings:
-            rating_lines.append('%s: %s' % (team.name, new_rating - old_rating))
+        for team, rating in sorted(ratings, key=lambda r: r[1].value, reverse=True):
+            rating_lines.append('%s: %s' % (team.name, rating))
         bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
 
     def _update_job(self, bot, job):
