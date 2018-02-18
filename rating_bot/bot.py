@@ -109,7 +109,7 @@ class Bot:
             raise RatingBotError('Нет подписок')
         for team in teams:
             new_rating = self._rating.get_rating(team.id)
-            old_rating = self._db.get_saved_reating(chat_id, team.id)
+            old_rating = self._db.get_saved_rating(chat_id, team.id)
             if old_rating != new_rating:
                 self._db.update_rating(chat_id, team.id, new_rating)
                 changed = True

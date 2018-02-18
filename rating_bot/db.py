@@ -67,7 +67,7 @@ class Database:
             rows = c.fetchall()
         return [Team(*row) for row in rows]
 
-    def get_saved_reating(self, chat_id, team_id):
+    def get_saved_rating(self, chat_id, team_id):
         conn = self._connect()
         with conn:
             c = conn.cursor()
