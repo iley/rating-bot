@@ -35,7 +35,7 @@ class Rating:
         return Rating(self.value,
                       self.position,
                       self.value - other.value,
-                      self.position - other.position)
+                      other.position - self.position)
 
     @classmethod
     def fromJSON(self, json):
