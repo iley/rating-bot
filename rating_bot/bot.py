@@ -14,7 +14,7 @@ UPDATE_SECONDS = 15 * 60
 class Bot:
     INT_ARG_RE = re.compile(r'/\S+\s+(\d+)')
 
-    def __init__(self, token, db, rating):
+    def __init__(self, token, db, rating, min_rating_diff):
         self._updater = Updater(token)
         self._updater.dispatcher.add_handler(
             CommandHandler('start', self.handle_help))
@@ -32,6 +32,7 @@ class Bot:
             CommandHandler('update', self.handle_update))
         self._db = db
         self._rating = rating
+        self._min_rating_diff = min_rating_diff
 
     def run(self):
         log.info('Starting the telegram bot')
@@ -62,7 +63,7 @@ class Bot:
             self._db.add_subscription(chat_id, team_id, team_name)
             update.message.reply_text('Вы подписались на обновления рейтинга команды %s (%d)' %
                                       (team_name, team_id))
-            _, ratings = self._update(chat_id)
+            _, ratings = self._update(chat_id, force=True)
             self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
@@ -98,25 +99,27 @@ class Bot:
         chat_id = update.message.chat.id
         try:
             bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
-            _, ratings = self._update(chat_id)
+            _, ratings = self._update(chat_id, force=True)
             self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
 
-    def _update(self, chat_id):
+    def _update(self, chat_id, force=False):
         log.info('Updating rating for chat %d' % chat_id)
         teams = self._db.get_subscriptions(chat_id)
         ratings = []
-        changed = False
+        changed = force
         if not teams:
             raise RatingBotError('Нет подписок')
         for team in teams:
-            new_rating = self._rating.get_rating(team.id)
             old_rating = self._db.get_saved_rating(chat_id, team.id)
-            if old_rating != new_rating:
-                self._db.update_rating(chat_id, team.id, new_rating)
+            new_rating = self._rating.get_rating(team.id)
+            if self._differs_significantly(old_rating, new_rating):
                 changed = True
             ratings.append((team, new_rating - old_rating))
+        if changed:
+            for team, rating in ratings:
+                self._db.update_rating(chat_id, team.id, rating)
         return changed, ratings
 
     def _send_update(self, bot, chat_id, ratings):
@@ -131,3 +134,6 @@ class Bot:
             changed, ratings = self._update(chat_id)
             if changed:
                 self._send_update(bot, chat_id, ratings)
+
+    def _differs_significantly(self, rating1, rating2):
+        return abs(rating1.value - rating2.value) > self._min_rating_diff
