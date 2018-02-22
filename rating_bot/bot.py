@@ -8,7 +8,7 @@ from .exc import RatingBotError
 
 log = logging.getLogger(__name__)
 
-UPDATE_SECONDS = 15 * 60
+UPDATE_SECONDS = 30 * 60
 
 
 class Bot:
