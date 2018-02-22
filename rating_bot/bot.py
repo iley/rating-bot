@@ -14,7 +14,7 @@ UPDATE_SECONDS = 30 * 60
 class Bot:
     INT_ARG_RE = re.compile(r'/\S+\s+(\d+)')
 
-    def __init__(self, token, db, rating, min_rating_diff):
+    def __init__(self, token, db, rating_client, min_rating_diff):
         self._updater = Updater(token)
         self._updater.dispatcher.add_handler(
             CommandHandler('start', self.handle_help))
@@ -31,7 +31,7 @@ class Bot:
         self._updater.dispatcher.add_handler(
             CommandHandler('update', self.handle_update))
         self._db = db
-        self._rating = rating
+        self._rating_client = rating_client
         self._min_rating_diff = min_rating_diff
 
     def run(self):
@@ -58,7 +58,7 @@ class Bot:
         team_id = int(match.group(1))
         bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
         try:
-            team_info = self._rating.team_info(team_id)
+            team_info = self._rating_client.team_info(team_id)
             team_name = team_info['name']
             self._db.add_subscription(chat_id, team_id, team_name)
             update.message.reply_text('Вы подписались на обновления рейтинга команды %s (%d)' %
@@ -113,7 +113,7 @@ class Bot:
             raise RatingBotError('Нет подписок')
         for team in teams:
             old_rating = self._db.get_saved_rating(chat_id, team.id)
-            new_rating = self._rating.get_rating(team.id)
+            new_rating = self._rating_client.get_rating(team.id)
             if self._differs_significantly(old_rating, new_rating):
                 changed = True
             ratings.append((team, new_rating - old_rating))
