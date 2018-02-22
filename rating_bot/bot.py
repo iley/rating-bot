@@ -55,12 +55,15 @@ class Bot:
             update.message.reply_text('Неверный формат сообщения. Должно быть: /follow TEAM_ID')
             return
         team_id = int(match.group(1))
+        bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
         try:
             team_info = self._rating.team_info(team_id)
             team_name = team_info['name']
             self._db.add_subscription(chat_id, team_id, team_name)
             update.message.reply_text('Вы подписались на обновления рейтинга команды %s (%d)' %
                                       (team_name, team_id))
+            _, ratings = self._update(chat_id)
+            self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
             update.message.reply_text('Ошбика: %s' % ex)
 
