@@ -8,13 +8,11 @@ from .exc import RatingBotError
 
 log = logging.getLogger(__name__)
 
-UPDATE_SECONDS = 30 * 60
-
 
 class Bot:
     INT_ARG_RE = re.compile(r'/\S+\s+(\d+)')
 
-    def __init__(self, token, db, rating_client, min_rating_diff):
+    def __init__(self, token, db, rating_client, min_rating_diff, interval_minutes):
         self._updater = Updater(token)
         self._updater.dispatcher.add_handler(
             CommandHandler('start', self.handle_help))
@@ -33,10 +31,13 @@ class Bot:
         self._db = db
         self._rating_client = rating_client
         self._min_rating_diff = min_rating_diff
+        self._interval_minutes = interval_minutes
 
     def run(self):
         log.info('Starting the telegram bot')
-        self._updater.job_queue.run_repeating(self._update_job, UPDATE_SECONDS)
+        interval_seconds = self._interval_minutes * 60
+        log.info('Scheduling an update every %d seconds' % interval_seconds)
+        self._updater.job_queue.run_repeating(self._update_job, self._interval_minutes * 60)
         self._updater.start_polling()
         self._updater.idle()
 
@@ -133,7 +134,14 @@ class Bot:
         for chat_id in chat_ids:
             changed, ratings = self._update(chat_id)
             if changed:
+                log.info('Rating changed, sending a notification')
                 self._send_update(bot, chat_id, ratings)
+            else:
+                log.info('Rating not changed')
 
-    def _differs_significantly(self, rating1, rating2):
-        return abs(rating1.value - rating2.value) > self._min_rating_diff
+    def _differs_significantly(self, old, new):
+        if abs(new.value - old.value) > self._min_rating_diff:
+            return True
+        if old.release is not None and new.release != old.release:
+            return True
+        return False

@@ -16,6 +16,7 @@ CREATE TABLE subscriptions (
     team_name TEXT,
     rating REAL,
     position REAL,
+    release INTEGER,
     PRIMARY KEY(chat_id, team_id)
 );
 '''
@@ -63,7 +64,8 @@ class Database:
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('SELECT team_id, team_name FROM subscriptions WHERE chat_id=?', (chat_id,))
+            c.execute('SELECT team_id, team_name FROM subscriptions ' +
+                      'WHERE chat_id=?', (chat_id,))
             rows = c.fetchall()
         return [Team(*row) for row in rows]
 
@@ -71,19 +73,23 @@ class Database:
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('SELECT rating, position FROM subscriptions WHERE chat_id=? AND team_id=?',
+            c.execute('SELECT rating, position, release FROM subscriptions '+
+                      'WHERE chat_id=? AND team_id=?',
                       (chat_id, team_id))
             row = c.fetchone()
             if not row:
                 return None
-            return Rating(*row)
+            return Rating(value=row[0],
+                          position=row[1],
+                          release=row[2])
 
     def update_rating(self, chat_id, team_id, rating):
         conn = self._connect()
         with conn:
             c = conn.cursor()
-            c.execute('UPDATE subscriptions SET rating=?, position=? WHERE chat_id=? AND team_id=?',
-                      (rating.value, rating.position, chat_id, team_id))
+            c.execute('UPDATE subscriptions SET rating=?, position=?, release=? '+
+                      'WHERE chat_id=? AND team_id=?',
+                      (rating.value, rating.position, rating.release, chat_id, team_id))
 
     def get_chat_ids(self):
         conn = self._connect()

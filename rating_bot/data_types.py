@@ -8,11 +8,12 @@ class Team:
 
 
 class Rating:
-    def __init__(self, value, position, value_diff=None, position_diff=None):
+    def __init__(self, value, position, value_diff=None, position_diff=None, release=None):
         self.value = value or 0
         self.position = position or 0
         self.value_diff = value_diff
         self.position_diff = position_diff
+        self.release = release
 
     def __str__(self):
         value_str = str(self.value)
@@ -35,11 +36,16 @@ class Rating:
         return Rating(self.value,
                       self.position,
                       self.value - other.value,
-                      other.position - self.position)
+                      other.position - self.position,
+                      self.release)
 
     @classmethod
     def fromJSON(self, json):
-        return Rating(int(json['rating']), float(json['rating_position']))
+        return Rating(value=int(json['rating']),
+                      position=float(json['rating_position']),
+                      value_diff=0,
+                      position_diff=0,
+                      release=int(json['idrelease']))
 
 
 def format_float(x):
