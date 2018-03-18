@@ -51,14 +51,14 @@ class Database:
                                  (team_name, team_id)) from ex
 
     def remove_subscription(self, chat_id, team_id):
-        try:
-            conn = self._connect()
-            with conn:
-                conn.execute('DELETE FROM subscriptions WHERE chat_id=? AND team_ID=?',
-                            (chat_id, team_id))
-        except sqlite3.IntegrityError as ex:
-            raise RatingBotError('Вы не подписаны на обновления команды %s (%d)' %
-                                 (team_name, team_id)) from ex
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM subscriptions WHERE chat_id=? AND team_ID=?',
+                      (chat_id, team_id))
+            c.execute('SELECT changes()')
+            if c.fetchone()[0] == 0:
+                raise RatingBotError('Вы не подписаны на обновления команды #%d' % team_id)
 
     def get_subscriptions(self, chat_id):
         conn = self._connect()
