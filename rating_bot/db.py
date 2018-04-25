@@ -72,6 +72,7 @@ class Database:
             rows = c.fetchall()
         res = [Team(*row) for row in rows]
         gauge_subscriptions.set(len(res))
+        return res
 
     def get_saved_rating(self, chat_id, team_id):
         conn = self._connect()
