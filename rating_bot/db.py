@@ -10,6 +10,7 @@ from .data_types import Team, Rating
 
 log = logging.getLogger(__name__)
 gauge_subscriptions = Gauge('rating_bot_subscriptions', 'Total number of subscriptions')
+gauge_chats = Gauge('rating_bot_chats', 'Number of chats which have subscriptions')
 
 
 SCHEMA = '''
@@ -32,6 +33,7 @@ class Database:
         if new_file:
             log.info('Initializing database %s' % path)
             self.create_schema()
+        gauge_subscriptions.set_function(self.get_total_subscriptions)
 
     def _connect(self):
         return sqlite3.connect(self._path)
@@ -70,9 +72,7 @@ class Database:
             c.execute('SELECT team_id, team_name FROM subscriptions ' +
                       'WHERE chat_id=?', (chat_id,))
             rows = c.fetchall()
-        res = [Team(*row) for row in rows]
-        gauge_subscriptions.set(len(res))
-        return res
+        return [Team(*row) for row in rows]
 
     def get_saved_rating(self, chat_id, team_id):
         conn = self._connect()
@@ -102,4 +102,14 @@ class Database:
             c = conn.cursor()
             c.execute('SELECT DISTINCT chat_id FROM subscriptions')
             rows = c.fetchall()
-        return [r[0] for r in rows]
+        res = [r[0] for r in rows]
+        gauge_chats.set(len(res))
+        return res
+
+    def get_total_subscriptions(self):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('SELECT count(*) FROM subscriptions ')
+            row = c.fetchone()
+        return row[0]
