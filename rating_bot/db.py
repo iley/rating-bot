@@ -2,11 +2,14 @@
 import sqlite3
 import os.path
 import logging
+from prometheus_client import Gauge
+
 from .exc import RatingBotError
 from .data_types import Team, Rating
 
 
 log = logging.getLogger(__name__)
+gauge_subscriptions = Gauge('rating_bot_subscriptions', 'Total number of subscriptions')
 
 
 SCHEMA = '''
@@ -67,7 +70,8 @@ class Database:
             c.execute('SELECT team_id, team_name FROM subscriptions ' +
                       'WHERE chat_id=?', (chat_id,))
             rows = c.fetchall()
-        return [Team(*row) for row in rows]
+        res = [Team(*row) for row in rows]
+        gauge_subscriptions.set(len(res))
 
     def get_saved_rating(self, chat_id, team_id):
         conn = self._connect()

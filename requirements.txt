@@ -1,3 +1,4 @@
 python-telegram-bot==9.0.0
 requests==2.18.4
 expiringdict==1.1.4
+prometheus-client==0.2.0

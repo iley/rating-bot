@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
-import telegram
+from prometheus_client import Histogram, Counter
 from telegram.ext import Updater, CommandHandler
 import logging
 import re
+import telegram
+
 from .exc import RatingBotError
 
 
 log = logging.getLogger(__name__)
+hist_update = Histogram('rating_bot_update_batch_seconds', 'Time spent updating ratings')
+counter_ping = Counter('rating_bot_pings', 'Ping messages received')
 
 
 class Bot:
@@ -46,6 +50,7 @@ class Bot:
                                   '/follow, /unfollow, /subscriptions, /update, /ping')
 
     def handle_ping(self, bot, update):
+        counter_ping.inc()
         update.message.reply_text('PONG')
 
     def handle_follow(self, bot, update):
@@ -129,6 +134,7 @@ class Bot:
             rating_lines.append('%s: %s' % (team.name, rating))
         bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
 
+    @hist_update.time()
     def _update_job(self, bot, job):
         chat_ids = self._db.get_chat_ids()
         for chat_id in chat_ids:
