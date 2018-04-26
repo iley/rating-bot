@@ -9,7 +9,8 @@ from .data_types import Rating
 
 log = logging.getLogger(__name__)
 hist_fetch_rating = Histogram('rating_bot_fetch_rating_seconds',
-                              'Time spent fetching data from the Rating website')
+                              'Time spent fetching data from the Rating website',
+                              buckets=(1, 2, 4, 8, 16, 32, 64, float("inf")))
 
 
 class RatingClient:

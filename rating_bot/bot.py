@@ -9,7 +9,9 @@ from .exc import RatingBotError
 
 
 log = logging.getLogger(__name__)
-hist_update = Histogram('rating_bot_update_batch_seconds', 'Time spent updating ratings')
+hist_update = Histogram('rating_bot_update_batch_seconds',
+                        'Time spent updating ratings',
+                        buckets=(1, 2, 4, 8, 16, 32, 64, float("inf")))
 counter_ping = Counter('rating_bot_pings', 'Ping messages received')
 
 
