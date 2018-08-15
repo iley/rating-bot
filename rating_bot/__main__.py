@@ -21,7 +21,7 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
 
-    loglevel = logging.DEBUG if args.verbose > 0 else logging.INFO
+    loglevel = logging.DEBUG if args.verbose > 0 else logging.WARN
     logging.basicConfig(level=loglevel)
 
     start_http_server(args.mon_port)
