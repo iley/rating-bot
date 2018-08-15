@@ -1,0 +1,9 @@
+version: '2'
+services:
+  rating_bot:
+    image: "istrukov/rating-bot:latest"
+    restart: unless-stopped
+    ports: [ "8000:8000"]
+    command: [ "--token", "${TELEGRAM_TOKEN}", "--db", "/opt/rating_bot/data/rating.db" ]
+    volumes:
+      - /var/data/rating_bot:/opt/rating_bot/data
