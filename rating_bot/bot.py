@@ -122,6 +122,11 @@ class Bot:
         for team in teams:
             old_rating = self._db.get_saved_rating(chat_id, team.id)
             new_rating = self._rating_client.get_rating(team.id)
+            # Workaround for an API glitch.
+            if new_rating.value == 0:
+                new_rating.value = old_rating.value
+            if new_rating.position == 0:
+                new_rating.position = old_rating.position
             if self._differs_significantly(old_rating, new_rating):
                 changed = True
             ratings.append((team, new_rating - old_rating))
