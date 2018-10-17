@@ -19,5 +19,5 @@ Make note of the API token.
 
 4. Run the bot locally
 ```bash
-python -m rating_bot --token YOUR-TOKEN-HERE
+python -m rating_bot -v --token YOUR-TOKEN-HERE
 ```
