@@ -10,7 +10,7 @@ source ~/venv/bin/activate
 
 2. Install dependencies
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 3. Register a Telegram bot for testing using [BotFather](https://telegram.me/botfather).
@@ -19,5 +19,5 @@ Make note of the API token.
 
 4. Run the bot locally
 ```bash
-python -m rating_bot -v --token YOUR-TOKEN-HERE
+python3 -m rating_bot -v --token YOUR-TOKEN-HERE
 ```
