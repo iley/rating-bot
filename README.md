@@ -8,6 +8,8 @@ python3 -m venv ~/venv
 source ~/venv/bin/activate
 ```
 
+You'll need to re-activate the virtualenv each time you open a new shell. Run `source ~/venv/bin/activate` again. The shell prompt should indicate the environment name e.g. `(venv) user@host $`.
+
 2. Install dependencies
 ```bash
 pip install -r requirements.txt
