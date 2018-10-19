@@ -21,3 +21,5 @@ Make note of the API token.
 ```bash
 python -m rating_bot -v --token YOUR-TOKEN-HERE
 ```
+
+Alternatively you can skip step 1 and use the system-wide python. In such case run `python3` and `pip3`.
