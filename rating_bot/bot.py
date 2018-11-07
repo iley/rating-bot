@@ -48,8 +48,10 @@ class Bot:
         self._updater.idle()
 
     def handle_help(self, bot, update):
-        update.message.reply_text('Доступные команды: ' +
-                                  '/follow, /unfollow, /subscriptions, /update, /ping')
+        update.message.reply_text(
+            'Бот следит за рейтингом на rating.chgk.info.\n' +
+            'Доступные команды: /follow, /unfollow, /subscriptions, /update\n' +
+            'Исходники: github.com/iley/rating-bot')
 
     def handle_ping(self, bot, update):
         counter_ping.inc()
