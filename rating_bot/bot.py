@@ -6,6 +6,7 @@ import re
 import telegram
 
 from .exc import RatingBotError
+from .rating_client import TournamentStatus
 
 
 log = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class Bot:
         self._updater.job_queue.run_repeating(self._update_job, self._interval_minutes * 60)
         self._updater.start_polling()
         self._updater.idle()
+
 
     def handle_help(self, bot, update):
         update.message.reply_text('Доступные команды: ' +
@@ -105,12 +107,16 @@ class Bot:
 
     def handle_update(self, bot, update):
         chat_id = update.message.chat.id
+        log.info('!!!!!!!!!!!!!!!!!!')
+        msg = self._check_tournaments(chat_id, 51253)
+        if msg:
+            bot.send_message(chat_id=chat_id, text=msg)
         try:
             bot.send_chat_action(chat_id=chat_id, action=telegram.ChatAction.TYPING)
             _, ratings = self._update(chat_id, force=True)
             self._send_update(bot, chat_id, ratings)
         except RatingBotError as ex:
-            update.message.reply_text('Ошбика: %s' % ex)
+            update.message.reply_text('Ошибка: %s' % ex)
 
     def _update(self, chat_id, force=False):
         log.info('Updating rating for chat %d' % chat_id)
@@ -141,10 +147,32 @@ class Bot:
             rating_lines.append('%s: %s' % (team.name, rating))
         bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
 
+    def _check_tournaments(self, chat_id, team_id):
+        log.info('111111111111111 ')
+        tournaments = self._rating_client.fetch_tournaments(team_id)
+        msg = ''
+        for tournament_id in tournaments:
+            saved_status = self._db.get_tournament_status(chat_id, int(tournament_id))
+            if saved_status == TournamentStatus.APPEALS_DONE:
+                log.info('continue')
+                continue
+            name, status = self._rating_client.fetch_tournament(int(tournament_id))
+            if not saved_status:
+                self._db.add_tournament_status(chat_id, int(tournament_id), status)
+            elif saved_status != status:
+                self._db.update_tournament_status(chat_id, int(tournament_id), status)
+            if not saved_status or saved_status != status:
+                msg += ('%s: %s\n' % (name, status))
+        return msg
+
     @hist_update.time()
     def _update_job(self, bot, job):
         chat_ids = self._db.get_chat_ids()
         for chat_id in chat_ids:
+            log.info('!!!!!!!!!!!!!!!!!!')
+            msg = self._check_tournaments(chat_id, 51253)
+            if msg:
+                bot.send_message(chat_id=chat_id, text=msg)
             changed, ratings = self._update(chat_id)
             if changed:
                 log.info('Rating changed, sending a notification')
