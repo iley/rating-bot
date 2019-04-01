@@ -5,6 +5,7 @@ import logging
 import re
 import telegram
 from datetime import datetime, timedelta
+from expiringdict import ExpiringDict
 
 from .exc import RatingBotError
 from .data_types import TournamentStatus
@@ -19,6 +20,7 @@ counter_ping = Counter('rating_bot_pings', 'Ping messages received')
 
 class Bot:
     INT_ARG_RE = re.compile(r'/\S+\s+(\d+)')
+    MY_CHAT_ID = 141728270
 
     def __init__(self, token, db, rating_client, min_rating_diff, interval_minutes):
         self._updater = Updater(token)
@@ -33,6 +35,10 @@ class Bot:
         self._updater.dispatcher.add_handler(
             CommandHandler('unfollow', self.handle_unfollow))
         self._updater.dispatcher.add_handler(
+            CommandHandler('follow_city', self.handle_follow_city))
+        self._updater.dispatcher.add_handler(
+            CommandHandler('unfollow_city', self.handle_unfollow_city))
+        self._updater.dispatcher.add_handler(
             CommandHandler('subscriptions', self.handle_subscriptions))
         self._updater.dispatcher.add_handler(
             CommandHandler('update', self.handle_update))
@@ -41,25 +47,59 @@ class Bot:
         self._min_rating_diff = min_rating_diff
         self._interval_minutes = interval_minutes
         self._city_tournaments = {}
+        self._cache = ExpiringDict(max_len=100, max_age_seconds=5*60)
+        self._last_rating_update = ExpiringDict(max_len=100, max_age_seconds=24*60*60)
 
     def run(self):
         log.info('Starting the telegram bot')
         interval_seconds = self._interval_minutes * 60
         log.info('Scheduling an update every %d seconds' % interval_seconds)
-        first_delta = timedelta(minutes = 61 - datetime.today().minute)
+        first_delta = timedelta(minutes = self._interval_minutes + 1 - datetime.today().minute%self._interval_minutes)
         log.info('delta ' + str(first_delta))
+        self._updater.job_queue.run_once(self._startup_job, when=1)
         self._updater.job_queue.run_repeating(self._update_job, interval=self._interval_minutes * 60, first=first_delta)
         self._updater.start_polling()
         self._updater.idle()
 
-
     def handle_help(self, bot, update):
         update.message.reply_text('Доступные команды: ' +
-                                  '/follow, /unfollow, /subscriptions, /update, /ping')
+                                  '/follow, /unfollow, /subscriptions, /update, /ping, /follow_city, /unfollow_city')
 
     def handle_ping(self, bot, update):
         counter_ping.inc()
         update.message.reply_text('PONG')
+
+    def handle_follow_city(self, bot, update):
+        chat_id = update.message.chat.id
+        msg_text = update.message.text
+        log.info('Received follow message: "%s"', msg_text)
+        match = self.INT_ARG_RE.match(msg_text)
+        if not match:
+            update.message.reply_text('Неверный формат сообщения. Должно быть: /follow_city CITY_ID')
+            return
+        city_id = int(match.group(1))
+        try:
+            city_name = self._rating_client.fetch_tournaments_for_city(city_id)[0]
+            self._db.add_city_subscription(chat_id, city_id, city_name)
+            update.message.reply_text('Вы подписались на синхроны города %s (%d)' %
+                                      (city_name, city_id))
+        except RatingBotError as ex:
+            update.message.reply_text('Ошибка: %s' % ex)
+
+    def handle_unfollow_city(self, bot, update):
+        chat_id = update.message.chat.id
+        msg_text = update.message.text
+        log.info('Received unfollow message: "%s"', msg_text)
+        match = self.INT_ARG_RE.match(msg_text)
+        if not match:
+            update.message.reply_text('Неверный формат сообщения. Должно быть: /unfollow_city CITY_ID')
+            return
+        city_id = int(match.group(1))
+        try:
+            self._db.remove_city_subscription(chat_id, city_id)
+            update.message.reply_text('Вы отменили подписку на город #%d' % city_id)
+        except RatingBotError as ex:
+            update.message.reply_text('Ошбика: %s' % ex)
 
     def handle_follow(self, bot, update):
         chat_id = update.message.chat.id
@@ -112,15 +152,9 @@ class Bot:
     def handle_update(self, bot, update):
         chat_id = update.message.chat.id
         log.info('!!!!!!!!!!!!!!!!!!')
-        msg = self._check_city(chat_id, 205, force_update = True)
-        if msg:
-            bot.send_message(chat_id=chat_id, text=msg)
+        self._update_cities(bot, chat_id=chat_id, force_update = True)
 
-        msg = self._check_city(chat_id, 31, force_update = True)
-        if msg:
-            bot.send_message(chat_id=chat_id, text=msg)
-
-        msg = self._check_tournaments(chat_id, force_update = False)
+        msg = self._check_tournaments(chat_id, force_update = True)
         if msg:
             bot.send_message(chat_id=chat_id, text=msg)
         try:
@@ -141,6 +175,8 @@ class Bot:
             old_rating = self._db.get_saved_rating(chat_id, team.id)
             new_rating = self._rating_client.get_rating(team.id)
             # Workaround for an API glitch.
+            if old_rating.release > new_rating.release:
+              new_rating = old_rating;
             if new_rating.value == 0:
                 new_rating.value = old_rating.value
             if new_rating.position == 0:
@@ -159,23 +195,26 @@ class Bot:
             rating_lines.append('%s: %s' % (team.name, rating))
         bot.send_message(chat_id=chat_id, text=('Рейтинг обновлён:\n%s' % '\n'.join(rating_lines)))
 
-    def _check_city(self, chat_id, city_id, force_update = False):
+    def _check_city(self, city_id, force_update = False):
         city_tournaments = self._rating_client.fetch_tournaments_for_city(city_id)
-        msg = ''
-        if (not chat_id in self._city_tournaments):
-            self._city_tournaments[chat_id] = {}
-        if (not city_id in self._city_tournaments[chat_id]):
-            self._city_tournaments[chat_id][city_id] = city_tournaments
+        msgs = []
+        if (not city_id in self._city_tournaments):
+            self._city_tournaments[city_id] = city_tournaments[1]
             if not force_update:
-                return msg
+                return msgs
 
-        if (force_update or len(city_tournaments[1]) > len(self._city_tournaments[chat_id][city_id][1])):
-            msg = '%s:\n' % city_tournaments[0]
-            for info in city_tournaments[1]:
-                msg += '%s %s: Ведущий %s, представитель %s\n' % info[1:5]
-                msg += 'Редакторы: ' + ', '.join(info[5:]) + '\n\n'
-        self._city_tournaments[chat_id][city_id] = city_tournaments
-        return msg
+        for tournament_id, sync_apps in city_tournaments[1].items():
+            if (not force_update and tournament_id in self._city_tournaments[city_id] and len(sync_apps) <= len(self._city_tournaments[city_id][tournament_id])):
+                continue
+            msg = ''
+            if len(msgs) == 0:
+                msg = '%s:\n' % city_tournaments[0]
+            msg += sync_apps[0]._tournament_name + '\n'
+            for sync_app in sync_apps:
+                msg += '%s: Ведущий %s, представитель %s\n' % (sync_app._time, sync_app._leader_name, sync_app._delegate_name)
+            msgs.append(msg)
+        self._city_tournaments[city_id] = city_tournaments[1]
+        return msgs
 
     def _check_tournaments(self, chat_id, force_update = False):
         log.info('111111111111111 ')
@@ -190,7 +229,7 @@ class Bot:
                 if saved_status == TournamentStatus.LONG_GONE and not force_update:
                     continue
                 tournament_info = self._rating_client.fetch_tournament(int(tournament_id))
-                if tournament_info.time_delta > timedelta(days=21):
+                if tournament_info.time_delta > timedelta(days=10):
                     if not saved_status or (saved_status >= TournamentStatus.RESULTS_OPEN and tournament_info.isOchnik()) or (saved_status >= TournamentStatus.APPEALS_DONE and not tournament_info.isOchnik()):
                         tournament_info.status = TournamentStatus.LONG_GONE
 
@@ -204,29 +243,50 @@ class Bot:
                     msg += ('%s: %s (%s)\n' % (tournament_info.name, tournament_info.status, self._rating_client.status_url(int(tournament_id), tournament_info.status)))
         return msg
 
+    def _startup_job(self, bot, job):
+        log.info('_startup_job')
+        chat_ids = self._db.get_chat_ids()
+        for chat_id in chat_ids:
+            #log.info('chat_id ' + str(chat_id))
+            if chat_id == self.MY_CHAT_ID:
+                try:
+                    bot.send_message(chat_id=chat_id, text='Preved')
+                except:
+                    log.error('%s is blocked' % chat_id)
+
+    def _update_cities(self, bot, chat_id, force_update = False):
+        cities = self._db.get_city_subscriptions(chat_id)
+        for city in cities:
+            log.info('city ' + str(city))
+            if not city in self._cache or force_update:
+                self._cache[city] = self._check_city(city, force_update);
+            for msg in self._cache[city]:
+                bot.send_message(chat_id=chat_id, text=msg)
+
     @hist_update.time()
     def _update_job(self, bot, job):
         chat_ids = self._db.get_chat_ids()
         log.info('Using %d chats' % len(chat_ids))
         for chat_id in chat_ids:
-            log.info('!!!!!!!!!!!!!!!!!!')
-            msg = self._check_city(chat_id, 205)
-            if msg:
-                bot.send_message(chat_id=chat_id, text=msg)
+            try:
+                self._update_cities(bot, chat_id=chat_id)
 
-            msg = self._check_city(chat_id, 31)
-            if msg:
-                bot.send_message(chat_id=chat_id, text=msg)
+                msg = self._check_tournaments(chat_id)
+                if msg:
+                    bot.send_message(chat_id=chat_id, text=msg)
 
-            msg = self._check_tournaments(chat_id)
-            if msg:
-                bot.send_message(chat_id=chat_id, text=msg)
-            changed, ratings = self._update(chat_id)
-            if changed:
-                log.info('Rating changed, sending a notification')
-                self._send_update(bot, chat_id, ratings)
-            else:
-                log.info('Rating not changed')
+                if chat_id in self._last_rating_update:
+                    continue
+                changed, ratings = self._update(chat_id)
+                if changed:
+                    log.info('Rating changed, sending a notification')
+                    self._send_update(bot, chat_id, ratings)
+                    self._last_rating_update[chat_id] = chat_id
+                else:
+                    log.info('Rating not changed')
+            except:
+                #TODO remove chat_id from db in case it's blocked
+                log.error('error')
 
     def _differs_significantly(self, old, new):
         if abs(new.value - old.value) > self._min_rating_diff:

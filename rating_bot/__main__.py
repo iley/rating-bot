@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--db', type=str, default='rating.db', help='Telegram API token')
     parser.add_argument('--min_rating_diff', type=int, default=20,
                         help='Minimal rating difference to trigger notifications')
-    parser.add_argument('-i', '--interval_minutes', type=int, default=30)
+    parser.add_argument('-i', '--interval_minutes', type=int, default=60)
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
 

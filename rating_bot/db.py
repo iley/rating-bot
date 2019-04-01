@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     PRIMARY KEY(chat_id, team_id)
 );
 
+CREATE TABLE IF NOT EXISTS city_subscriptions (
+    chat_id INTEGER,
+    city_id INTEGER,
+    city_name  TEXT,
+    PRIMARY KEY(chat_id, city_id)
+);
+
 CREATE TABLE IF NOT EXISTS tournaments (
     chat_id INTEGER,
     tournament_id INTEGER,
@@ -80,6 +87,28 @@ class Database:
                       'WHERE chat_id=? AND tournament_id=?',
                       (int(status), chat_id, tournament_id))
 
+    def add_city_subscription(self, chat_id, city_id, city_name):
+        try:
+            conn = self._connect()
+            with conn:
+                conn.execute('INSERT INTO city_subscriptions ' +
+                             '(chat_id, city_id, city_name) ' +
+                             'VALUES (?, ?, ?)',
+                             (chat_id, city_id, city_name))
+        except sqlite3.IntegrityError as ex:
+            raise RatingBotError('Вы уже подписаны на синхроны города %s (%d)' %
+                                 (city_name, city_id)) from ex
+
+    def remove_city_subscription(self, chat_id, city_id):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM city_subscriptions WHERE chat_id=? AND city_id=?',
+                      (chat_id, city_id))
+            c.execute('SELECT changes()')
+            if c.fetchone()[0] == 0:
+                raise RatingBotError('Вы не подписаны на обновления города #%d' % team_id)
+
     def add_subscription(self, chat_id, team_id, team_name):
         try:
             conn = self._connect()
@@ -110,6 +139,15 @@ class Database:
                       'WHERE chat_id=?', (chat_id,))
             rows = c.fetchall()
         return [Team(*row) for row in rows]
+
+    def get_city_subscriptions(self, chat_id):
+        conn = self._connect()
+        with conn:
+            c = conn.cursor()
+            c.execute('SELECT city_id FROM city_subscriptions ' +
+                      'WHERE chat_id=?', (chat_id,))
+            rows = c.fetchall()
+        return [row[0] for row in rows]
 
     def get_saved_rating(self, chat_id, team_id):
         conn = self._connect()
