@@ -1,0 +1,15 @@
+diskSize: 2Gi
+telegramToken: ""
+
+image:
+  repository: istrukov/rating-bot
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

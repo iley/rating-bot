@@ -8,6 +8,8 @@ python3 -m venv ~/venv
 source ~/venv/bin/activate
 ```
 
+You'll need to re-activate the virtualenv each time you open a new shell. Run `source ~/venv/bin/activate` again. The shell prompt should indicate the environment name e.g. `(venv) user@host $`.
+
 2. Install dependencies
 ```bash
 pip install -r requirements.txt
@@ -21,3 +23,5 @@ Make note of the API token.
 ```bash
 python -m rating_bot -v --token YOUR-TOKEN-HERE
 ```
+
+Alternatively you can skip step 1 and use the system-wide python. In such case run `python3` and `pip3`.
