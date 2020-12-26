@@ -147,12 +147,15 @@ class Bot:
     def _update_job(self, bot, job):
         chat_ids = self._db.get_chat_ids()
         for chat_id in chat_ids:
-            changed, ratings = self._update(chat_id)
-            if changed:
-                log.info('Rating changed, sending a notification')
-                self._send_update(bot, chat_id, ratings)
-            else:
-                log.info('Rating not changed')
+            try:
+                changed, ratings = self._update(chat_id)
+                if changed:
+                    log.info('Rating changed, sending a notification')
+                    self._send_update(bot, chat_id, ratings)
+                else:
+                    log.info('Rating not changed')
+            except RatingBotError as ex:
+                log.warn('Error during update for chat %d: %s' % (chat_id, ex))
 
     def _differs_significantly(self, old, new):
         if abs(new.value - old.value) > self._min_rating_diff:
